@@ -5,7 +5,9 @@ import {
   crearUsuario, 
   actualizarUsuario, 
   eliminarUsuario,
-  resetearPassword
+  resetearPassword,
+  cambiarPassword,
+  cambiarMiPassword
 } from '../controllers/usuarios.controller.js';
 import { verifyToken, verifyRole } from '../middleware/auth.middleware.js';
 
@@ -28,6 +30,12 @@ router.put('/:id', verifyRole('Admin', 'Director'), actualizarUsuario);
 
 // DELETE /api/usuarios/:id - Eliminar un usuario
 router.delete('/:id', verifyRole('Admin', 'Director'), eliminarUsuario);
+
+// PUT /api/usuarios/:id/cambiar-password - Cambiar contraseña de usuario
+router.put('/:id/cambiar-password', verifyRole('Admin', 'Director'), cambiarPassword);
+
+// PUT /api/usuarios/:id/cambiar-mi-password - Cambiar mi propia contraseña
+router.put('/:id/cambiar-mi-password', cambiarMiPassword);
 
 // POST /api/usuarios/:id/resetear-password - Resetear contraseña
 router.post('/:id/resetear-password', verifyRole('Admin', 'Director'), resetearPassword);

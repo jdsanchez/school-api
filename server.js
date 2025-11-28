@@ -17,6 +17,7 @@ import asistenciaRoutes from './routes/asistencia.routes.js';
 import calificacionesRoutes from './routes/calificaciones.routes.js';
 import configuracionRoutes from './routes/configuracion.routes.js';
 import tareasRoutes from './routes/tareas.routes.js';
+import bannersRoutes from './routes/banners.routes.js';
 
 dotenv.config();
 
@@ -50,6 +51,7 @@ app.use('/api/asistencia', asistenciaRoutes);
 app.use('/api/calificaciones', calificacionesRoutes);
 app.use('/api/configuracion', configuracionRoutes);
 app.use('/api/tareas', tareasRoutes);
+app.use('/api/banners', bannersRoutes);
 
 // Ruta de prueba
 app.get('/', (req, res) => {

@@ -225,3 +225,79 @@ export const resetearPassword = async (req, res) => {
     res.status(500).json({ error: 'Error al resetear contraseña' });
   }
 };
+
+// Cambiar contraseña de un usuario (desde admin)
+export const cambiarPassword = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({ error: 'La contraseña es requerida' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+    }
+
+    const [usuarios] = await db.query('SELECT * FROM usuarios WHERE id = ?', [id]);
+    if (usuarios.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(password, salt);
+
+    await db.query('UPDATE usuarios SET password = ? WHERE id = ?', [passwordHash, id]);
+
+    res.json({ mensaje: 'Contraseña actualizada exitosamente' });
+  } catch (error) {
+    console.error('Error al cambiar contraseña:', error);
+    res.status(500).json({ error: 'Error al cambiar contraseña' });
+  }
+};
+
+// Cambiar mi propia contraseña (cualquier usuario)
+export const cambiarMiPassword = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { passwordActual, nuevaPassword } = req.body;
+
+    // Verificar que el usuario está cambiando su propia contraseña
+    if (parseInt(id) !== req.user.id) {
+      return res.status(403).json({ error: 'No tienes permiso para cambiar esta contraseña' });
+    }
+
+    if (!passwordActual || !nuevaPassword) {
+      return res.status(400).json({ error: 'La contraseña actual y la nueva contraseña son requeridas' });
+    }
+
+    if (nuevaPassword.length < 6) {
+      return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres' });
+    }
+
+    const [usuarios] = await db.query('SELECT * FROM usuarios WHERE id = ?', [id]);
+    if (usuarios.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    const usuario = usuarios[0];
+
+    // Verificar la contraseña actual
+    const passwordValida = await bcrypt.compare(passwordActual, usuario.password);
+    if (!passwordValida) {
+      return res.status(400).json({ error: 'La contraseña actual es incorrecta' });
+    }
+
+    // Hashear la nueva contraseña
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(nuevaPassword, salt);
+
+    await db.query('UPDATE usuarios SET password = ? WHERE id = ?', [passwordHash, id]);
+
+    res.json({ mensaje: 'Contraseña actualizada exitosamente' });
+  } catch (error) {
+    console.error('Error al cambiar contraseña:', error);
+    res.status(500).json({ error: 'Error al cambiar contraseña' });
+  }
+};
