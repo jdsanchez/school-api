@@ -14,7 +14,8 @@ import {
   marcarNotificacionLeida,
   verificarPagosAtrasados,
   obtenerEstadisticas,
-  obtenerMisPagos
+  obtenerMisPagos,
+  obtenerNotificacionesCompletas
 } from '../controllers/pagos.controller.js';
 import { verifyToken } from '../middleware/auth.middleware.js';
 
@@ -66,6 +67,7 @@ router.get('/estadisticas', verifyToken, obtenerEstadisticas);
 router.get('/mis-pagos', verifyToken, obtenerMisPagos);
 router.get('/alumno/:alumno_id', verifyToken, obtenerHistorialAlumno);
 router.get('/notificaciones/:alumno_id', verifyToken, obtenerNotificaciones);
+router.get('/notificaciones-completas/:alumno_id', verifyToken, obtenerNotificacionesCompletas);
 router.post('/', verifyToken, upload.single('comprobante'), registrarPago);
 router.put('/:id', verifyToken, upload.single('comprobante'), actualizarPago);
 router.put('/:id/confirmar', verifyToken, confirmarPago);

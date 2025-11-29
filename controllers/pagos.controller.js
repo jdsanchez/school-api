@@ -588,3 +588,134 @@ export const obtenerMisPagos = async (req, res) => {
     res.status(500).json({ mensaje: 'Error al obtener tus pagos' });
   }
 };
+
+// Obtener notificaciones completas (pagos, tareas, cursos)
+export const obtenerNotificacionesCompletas = async (req, res) => {
+  try {
+    const { alumno_id } = req.params;
+    const notificaciones = [];
+
+    // 1. Pagos rechazados (solo los que fueron rechazados)
+    const [pagosRechazados] = await pool.query(`
+      SELECT 
+        n.id,
+        n.pago_id as referencia_id,
+        'pago_rechazado' as tipo,
+        n.mensaje,
+        n.leido,
+        n.fecha_envio as created_at,
+        c.nombre as titulo,
+        p.monto as valor
+      FROM notificaciones_pago n
+      INNER JOIN pagos p ON n.pago_id = p.id
+      INNER JOIN cursos c ON p.curso_id = c.id
+      WHERE n.alumno_id = ? AND n.tipo = 'Rechazado'
+      ORDER BY n.fecha_envio DESC
+      LIMIT 20
+    `, [alumno_id]);
+
+    // 2. Pagos confirmados (solo los confirmados recientemente)
+    const [pagosConfirmados] = await pool.query(`
+      SELECT 
+        n.id,
+        n.pago_id as referencia_id,
+        'pago_confirmado' as tipo,
+        n.mensaje,
+        n.leido,
+        n.fecha_envio as created_at,
+        c.nombre as titulo,
+        p.monto as valor
+      FROM notificaciones_pago n
+      INNER JOIN pagos p ON n.pago_id = p.id
+      INNER JOIN cursos c ON p.curso_id = c.id
+      WHERE n.alumno_id = ? AND n.tipo = 'Confirmado'
+      ORDER BY n.fecha_envio DESC
+      LIMIT 10
+    `, [alumno_id]);
+
+    // 3. Tareas pendientes (no entregadas y fecha límite cercana o pasada)
+    const [tareasPendientes] = await pool.query(`
+      SELECT 
+        t.id as referencia_id,
+        'tarea_pendiente' as tipo,
+        CONCAT('Tarea pendiente: ', t.titulo) as mensaje,
+        FALSE as leido,
+        t.fecha_entrega as created_at,
+        c.nombre as titulo,
+        NULL as valor
+      FROM tareas t
+      INNER JOIN cursos c ON t.curso_id = c.id
+      INNER JOIN inscripciones i ON c.id = i.curso_id
+      LEFT JOIN entregas_tareas et ON t.id = et.tarea_id AND et.alumno_id = ?
+      WHERE i.alumno_id = ? 
+        AND t.activo = TRUE
+        AND et.id IS NULL
+        AND t.fecha_entrega >= CURDATE() - INTERVAL 7 DAY
+      ORDER BY t.fecha_entrega ASC
+      LIMIT 10
+    `, [alumno_id, alumno_id]);
+
+    // 4. Tareas atrasadas
+    const [tareasAtrasadas] = await pool.query(`
+      SELECT 
+        t.id as referencia_id,
+        'tarea_atrasada' as tipo,
+        CONCAT('Tarea atrasada: ', t.titulo, ' - Venció el ', DATE_FORMAT(t.fecha_entrega, '%d/%m/%Y')) as mensaje,
+        FALSE as leido,
+        t.fecha_entrega as created_at,
+        c.nombre as titulo,
+        NULL as valor
+      FROM tareas t
+      INNER JOIN cursos c ON t.curso_id = c.id
+      INNER JOIN inscripciones i ON c.id = i.curso_id
+      LEFT JOIN entregas_tareas et ON t.id = et.tarea_id AND et.alumno_id = ?
+      WHERE i.alumno_id = ? 
+        AND t.activo = TRUE
+        AND et.id IS NULL
+        AND t.fecha_entrega < CURDATE()
+      ORDER BY t.fecha_entrega DESC
+      LIMIT 5
+    `, [alumno_id, alumno_id]);
+
+    // 5. Cursos inscritos sin pagar
+    const [cursosSinPagar] = await pool.query(`
+      SELECT 
+        i.id as referencia_id,
+        'curso_sin_pagar' as tipo,
+        CONCAT('Pago pendiente para: ', c.nombre) as mensaje,
+        FALSE as leido,
+        i.fecha_inscripcion as created_at,
+        c.nombre as titulo,
+        c.costo as valor
+      FROM inscripciones i
+      INNER JOIN cursos c ON i.curso_id = c.id
+      LEFT JOIN pagos p ON i.curso_id = p.curso_id AND p.alumno_id = i.alumno_id AND p.estado = 'Pagado'
+      WHERE i.alumno_id = ? 
+        AND i.estado = 'Activo'
+        AND c.costo > 0
+        AND p.id IS NULL
+      LIMIT 10
+    `, [alumno_id]);
+
+    // Combinar todas las notificaciones
+    notificaciones.push(...pagosRechazados);
+    notificaciones.push(...pagosConfirmados);
+    notificaciones.push(...tareasPendientes);
+    notificaciones.push(...tareasAtrasadas);
+    notificaciones.push(...cursosSinPagar);
+
+    // Ordenar por fecha (más reciente primero)
+    notificaciones.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    // Convertir valores numéricos
+    const notificacionesFormateadas = notificaciones.map(notif => ({
+      ...notif,
+      valor: notif.valor ? parseFloat(notif.valor) : null
+    }));
+
+    res.json(notificacionesFormateadas);
+  } catch (error) {
+    console.error('Error al obtener notificaciones completas:', error);
+    res.status(500).json({ message: 'Error al obtener notificaciones' });
+  }
+};
