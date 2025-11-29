@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import db from '../config/database.js';
+import { enviarEmailRecuperacion } from '../config/email.js';
 
 // Login - Soporta email, código de alumno o DPI
 export const login = async (req, res) => {
@@ -155,16 +156,17 @@ export const recuperarPassword = async (req, res) => {
       [token, usuario.id]
     );
 
-    // TODO: Enviar email con el link de recuperación
-    // Por ahora, devolvemos el token para testing
-    const resetLink = `${process.env.FRONTEND_URL}/recuperar-password/${token}`;
+    // Enviar email con el link de recuperación
+    const nombreCompleto = `${usuario.nombre} ${usuario.apellido}`;
+    const resultadoEmail = await enviarEmailRecuperacion(usuario.email, nombreCompleto, token);
     
-    console.log('Link de recuperación:', resetLink);
+    if (!resultadoEmail.success) {
+      console.error('Error al enviar email:', resultadoEmail.error);
+      // No revelamos el error específico al usuario
+    }
 
     res.json({ 
-      mensaje: 'Si el correo existe, recibirás un enlace de recuperación',
-      // Solo en desarrollo - remover en producción
-      ...(process.env.NODE_ENV === 'development' && { resetLink })
+      mensaje: 'Si el correo existe, recibirás un enlace de recuperación en tu bandeja de entrada'
     });
   } catch (error) {
     console.error('Error al recuperar contraseña:', error);
