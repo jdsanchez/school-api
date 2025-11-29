@@ -2,6 +2,11 @@ import nodemailer from 'nodemailer';
 
 // Crear transporter de nodemailer
 const createTransporter = () => {
+  // Verificar que las variables estén configuradas
+  console.log('🔧 Configurando email service:', process.env.EMAIL_SERVICE);
+  console.log('📧 Email user:', process.env.EMAIL_USER ? '✓ Configurado' : '✗ NO configurado');
+  console.log('🔑 Email password:', process.env.EMAIL_PASSWORD ? '✓ Configurado' : '✗ NO configurado');
+  
   // Configuración para Gmail
   if (process.env.EMAIL_SERVICE === 'gmail') {
     return nodemailer.createTransport({
@@ -113,11 +118,17 @@ Equipo de Sistema Escolar
       `,
     };
 
+    console.log('📤 Enviando email a:', email);
+    console.log('🔗 Link de recuperación:', resetLink);
+    
     const info = await transporter.sendMail(mailOptions);
-    console.log('Email enviado:', info.messageId);
+    console.log('✅ Email enviado exitosamente! Message ID:', info.messageId);
+    console.log('📬 Response:', info.response);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('Error al enviar email:', error);
+    console.error('❌ Error detallado al enviar email:', error);
+    console.error('Error code:', error.code);
+    console.error('Error command:', error.command);
     return { success: false, error: error.message };
   }
 };
