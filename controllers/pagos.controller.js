@@ -645,9 +645,9 @@ export const obtenerNotificacionesCompletas = async (req, res) => {
         NULL as valor
       FROM tareas t
       INNER JOIN cursos c ON t.curso_id = c.id
-      INNER JOIN inscripciones i ON c.id = i.curso_id
+      INNER JOIN curso_alumnos ca ON c.id = ca.curso_id
       LEFT JOIN entregas_tareas et ON t.id = et.tarea_id AND et.alumno_id = ?
-      WHERE i.alumno_id = ? 
+      WHERE ca.alumno_id = ? 
         AND t.activo = TRUE
         AND et.id IS NULL
         AND t.fecha_entrega >= CURDATE() - INTERVAL 7 DAY
@@ -667,9 +667,9 @@ export const obtenerNotificacionesCompletas = async (req, res) => {
         NULL as valor
       FROM tareas t
       INNER JOIN cursos c ON t.curso_id = c.id
-      INNER JOIN inscripciones i ON c.id = i.curso_id
+      INNER JOIN curso_alumnos ca ON c.id = ca.curso_id
       LEFT JOIN entregas_tareas et ON t.id = et.tarea_id AND et.alumno_id = ?
-      WHERE i.alumno_id = ? 
+      WHERE ca.alumno_id = ? 
         AND t.activo = TRUE
         AND et.id IS NULL
         AND t.fecha_entrega < CURDATE()
@@ -680,18 +680,17 @@ export const obtenerNotificacionesCompletas = async (req, res) => {
     // 5. Cursos inscritos sin pagar
     const [cursosSinPagar] = await pool.query(`
       SELECT 
-        i.id as referencia_id,
+        ca.id as referencia_id,
         'curso_sin_pagar' as tipo,
         CONCAT('Pago pendiente para: ', c.nombre) as mensaje,
         FALSE as leido,
-        i.fecha_inscripcion as created_at,
+        ca.created_at,
         c.nombre as titulo,
         c.costo as valor
-      FROM inscripciones i
-      INNER JOIN cursos c ON i.curso_id = c.id
-      LEFT JOIN pagos p ON i.curso_id = p.curso_id AND p.alumno_id = i.alumno_id AND p.estado = 'Pagado'
-      WHERE i.alumno_id = ? 
-        AND i.estado = 'Activo'
+      FROM curso_alumnos ca
+      INNER JOIN cursos c ON ca.curso_id = c.id
+      LEFT JOIN pagos p ON ca.curso_id = p.curso_id AND p.alumno_id = ca.alumno_id AND p.estado = 'Pagado'
+      WHERE ca.alumno_id = ? 
         AND c.costo > 0
         AND p.id IS NULL
       LIMIT 10
