@@ -3,3 +3,5 @@ node_modules/
 *.log
 uploads/
 .DS_Store
+*.sql
+school_backup*.sql
