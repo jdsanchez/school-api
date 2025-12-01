@@ -646,7 +646,7 @@ export const obtenerNotificacionesCompletas = async (req, res) => {
       FROM tareas t
       INNER JOIN cursos c ON t.curso_id = c.id
       INNER JOIN curso_alumnos ca ON c.id = ca.curso_id
-      LEFT JOIN entregas_tareas et ON t.id = et.tarea_id AND et.alumno_id = ?
+      LEFT JOIN tareas_entregas et ON t.id = et.tarea_id AND et.alumno_id = ?
       WHERE ca.alumno_id = ? 
         AND t.activo = TRUE
         AND et.id IS NULL
@@ -668,7 +668,7 @@ export const obtenerNotificacionesCompletas = async (req, res) => {
       FROM tareas t
       INNER JOIN cursos c ON t.curso_id = c.id
       INNER JOIN curso_alumnos ca ON c.id = ca.curso_id
-      LEFT JOIN entregas_tareas et ON t.id = et.tarea_id AND et.alumno_id = ?
+      LEFT JOIN tareas_entregas et ON t.id = et.tarea_id AND et.alumno_id = ?
       WHERE ca.alumno_id = ? 
         AND t.activo = TRUE
         AND et.id IS NULL
