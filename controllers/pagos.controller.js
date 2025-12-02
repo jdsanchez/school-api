@@ -633,7 +633,7 @@ export const obtenerNotificacionesCompletas = async (req, res) => {
       LIMIT 10
     `, [alumno_id]);
 
-    // 3. Tareas pendientes (no entregadas y fecha límite cercana o pasada)
+    // 3. Tareas pendientes (no entregadas y fecha límite cercana)
     const [tareasPendientes] = await pool.query(`
       SELECT 
         t.id as referencia_id,
@@ -646,11 +646,12 @@ export const obtenerNotificacionesCompletas = async (req, res) => {
       FROM tareas t
       INNER JOIN cursos c ON t.curso_id = c.id
       INNER JOIN curso_alumnos ca ON c.id = ca.curso_id
-      LEFT JOIN tareas_entregas et ON t.id = et.tarea_id AND et.alumno_id = ?
+      LEFT JOIN tarea_entregadas te ON t.id = te.tarea_id AND te.alumno_id = ?
       WHERE ca.alumno_id = ? 
         AND t.activo = TRUE
-        AND et.id IS NULL
-        AND t.fecha_entrega >= CURDATE() - INTERVAL 7 DAY
+        AND te.id IS NULL
+        AND t.fecha_entrega >= CURDATE()
+        AND t.fecha_entrega <= CURDATE() + INTERVAL 7 DAY
       ORDER BY t.fecha_entrega ASC
       LIMIT 10
     `, [alumno_id, alumno_id]);
@@ -668,10 +669,10 @@ export const obtenerNotificacionesCompletas = async (req, res) => {
       FROM tareas t
       INNER JOIN cursos c ON t.curso_id = c.id
       INNER JOIN curso_alumnos ca ON c.id = ca.curso_id
-      LEFT JOIN tareas_entregas et ON t.id = et.tarea_id AND et.alumno_id = ?
+      LEFT JOIN tarea_entregadas te ON t.id = te.tarea_id AND te.alumno_id = ?
       WHERE ca.alumno_id = ? 
         AND t.activo = TRUE
-        AND et.id IS NULL
+        AND te.id IS NULL
         AND t.fecha_entrega < CURDATE()
       ORDER BY t.fecha_entrega DESC
       LIMIT 5
