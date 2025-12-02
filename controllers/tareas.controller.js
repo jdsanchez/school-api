@@ -260,12 +260,21 @@ export const obtenerEntregas = async (req, res) => {
   }
 };
 
-// Calificar entrega
+// Calificar entrega (aprobar)
 export const calificarEntrega = async (req, res) => {
   try {
     const { id } = req.params;
     const { calificacion, comentarios } = req.body;
     const calificado_por = req.usuario.id;
+
+    // Validar calificación
+    if (calificacion === undefined || calificacion === null) {
+      return res.status(400).json({ mensaje: 'La calificación es requerida' });
+    }
+
+    if (calificacion < 0 || calificacion > 100) {
+      return res.status(400).json({ mensaje: 'La calificación debe estar entre 0 y 100' });
+    }
 
     await db.query(
       `UPDATE tarea_entregas 
@@ -274,10 +283,35 @@ export const calificarEntrega = async (req, res) => {
       [calificacion, comentarios, calificado_por, id]
     );
 
-    res.json({ mensaje: 'Entrega calificada exitosamente' });
+    res.json({ mensaje: 'Tarea aprobada y calificada exitosamente' });
   } catch (error) {
     console.error('Error al calificar entrega:', error);
     res.status(500).json({ mensaje: 'Error al calificar entrega' });
+  }
+};
+
+// Rechazar entrega (para que el alumno la repita)
+export const rechazarEntrega = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { comentarios } = req.body;
+    const calificado_por = req.usuario.id;
+
+    if (!comentarios || comentarios.trim() === '') {
+      return res.status(400).json({ mensaje: 'Los comentarios son requeridos al rechazar una entrega' });
+    }
+
+    await db.query(
+      `UPDATE tarea_entregas 
+       SET estado = 'Rechazada', comentarios = ?, calificado_por = ?, fecha_calificacion = NOW(), calificacion = NULL
+       WHERE id = ?`,
+      [comentarios, calificado_por, id]
+    );
+
+    res.json({ mensaje: 'Tarea rechazada. El alumno deberá volver a entregarla.' });
+  } catch (error) {
+    console.error('Error al rechazar entrega:', error);
+    res.status(500).json({ mensaje: 'Error al rechazar entrega' });
   }
 };
 

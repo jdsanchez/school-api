@@ -12,6 +12,7 @@ import {
   entregarTarea,
   obtenerEntregas,
   calificarEntrega,
+  rechazarEntrega,
   obtenerMisTareas
 } from '../controllers/tareas.controller.js';
 
@@ -84,5 +85,6 @@ router.delete('/:id', eliminarTarea);
 router.post('/:tarea_id/entregar', uploadEntrega.single('archivo_entrega'), entregarTarea);
 router.get('/:tarea_id/entregas', obtenerEntregas);
 router.put('/entregas/:id/calificar', calificarEntrega);
+router.put('/entregas/:id/rechazar', rechazarEntrega);
 
 export default router;
