@@ -233,27 +233,58 @@ export const entregarTarea = async (req, res) => {
   }
 };
 
-// Obtener entregas de una tarea (maestro/admin)
+// Obtener entregas de una tarea con TODOS los alumnos del curso
 export const obtenerEntregas = async (req, res) => {
   try {
     const { tarea_id } = req.params;
 
-    const [entregas] = await db.query(
-      `SELECT 
-        te.*,
-        CONCAT(a.nombre, ' ', a.apellido) as alumno_nombre,
-        a.codigo_alumno,
-        a.email as alumno_email,
-        CONCAT(c.nombre, ' ', c.apellido) as calificado_por_nombre
-      FROM tarea_entregas te
-      INNER JOIN usuarios a ON te.alumno_id = a.id
-      LEFT JOIN usuarios c ON te.calificado_por = c.id
-      WHERE te.tarea_id = ?
-      ORDER BY te.fecha_entrega DESC`,
+    // Obtener información de la tarea incluyendo el curso
+    const [tareaInfo] = await db.query(
+      `SELECT curso_id, puntos_totales FROM tareas WHERE id = ?`,
       [tarea_id]
     );
 
-    res.json(entregas);
+    if (tareaInfo.length === 0) {
+      return res.status(404).json({ mensaje: 'Tarea no encontrada' });
+    }
+
+    const { curso_id, puntos_totales } = tareaInfo[0];
+
+    // Obtener TODOS los alumnos inscritos en el curso con su estado de entrega
+    const [alumnos] = await db.query(
+      `SELECT 
+        a.id as alumno_id,
+        a.nombre as alumno_nombre,
+        a.apellido as alumno_apellido,
+        a.codigo_alumno,
+        a.email as alumno_email,
+        te.id as entrega_id,
+        te.archivo_entrega,
+        te.comentarios as comentarios_alumno,
+        te.fecha_entrega,
+        te.estado,
+        te.calificacion,
+        te.comentarios as comentarios_calificacion,
+        te.fecha_calificacion,
+        te.calificado_por,
+        CONCAT(c.nombre, ' ', c.apellido) as calificado_por_nombre
+      FROM curso_alumnos ca
+      INNER JOIN usuarios a ON ca.alumno_id = a.id
+      LEFT JOIN tarea_entregas te ON te.tarea_id = ? AND te.alumno_id = a.id
+      LEFT JOIN usuarios c ON te.calificado_por = c.id
+      WHERE ca.curso_id = ?
+      ORDER BY a.apellido, a.nombre`,
+      [tarea_id, curso_id]
+    );
+
+    // Agregar información adicional
+    const resultado = alumnos.map(alumno => ({
+      ...alumno,
+      estado_real: alumno.entrega_id ? alumno.estado : 'No entregada',
+      puntos_totales: puntos_totales
+    }));
+
+    res.json(resultado);
   } catch (error) {
     console.error('Error al obtener entregas:', error);
     res.status(500).json({ mensaje: 'Error al obtener entregas' });
@@ -315,6 +346,46 @@ export const rechazarEntrega = async (req, res) => {
   }
 };
 
+// Calificar alumno que NO entregó (crear registro con calificación 0 o la que se especifique)
+export const calificarNoEntrega = async (req, res) => {
+  try {
+    const { tarea_id, alumno_id } = req.params;
+    const { calificacion, comentarios } = req.body;
+    const calificado_por = req.usuario.id;
+
+    // Validar que la calificación esté dentro del rango
+    if (calificacion === undefined || calificacion === null) {
+      return res.status(400).json({ mensaje: 'La calificación es requerida' });
+    }
+
+    if (calificacion < 0 || calificacion > 100) {
+      return res.status(400).json({ mensaje: 'La calificación debe estar entre 0 y 100' });
+    }
+
+    // Verificar que no exista una entrega previa
+    const [entregaExistente] = await db.query(
+      `SELECT id FROM tarea_entregas WHERE tarea_id = ? AND alumno_id = ?`,
+      [tarea_id, alumno_id]
+    );
+
+    if (entregaExistente.length > 0) {
+      return res.status(400).json({ mensaje: 'Este alumno ya tiene una entrega registrada' });
+    }
+
+    // Crear registro de "no entrega" con calificación
+    await db.query(
+      `INSERT INTO tarea_entregas (tarea_id, alumno_id, estado, calificacion, comentarios, calificado_por, fecha_calificacion)
+       VALUES (?, ?, 'No entregada', ?, ?, ?, NOW())`,
+      [tarea_id, alumno_id, calificacion, comentarios || 'No entregó la tarea', calificado_por]
+    );
+
+    res.json({ mensaje: 'Calificación registrada exitosamente' });
+  } catch (error) {
+    console.error('Error al calificar no entrega:', error);
+    res.status(500).json({ mensaje: 'Error al calificar no entrega' });
+  }
+};
+
 // Obtener mis tareas (alumno)
 export const obtenerMisTareas = async (req, res) => {
   try {
@@ -353,5 +424,57 @@ export const obtenerMisTareas = async (req, res) => {
   } catch (error) {
     console.error('Error al obtener mis tareas:', error);
     res.status(500).json({ mensaje: 'Error al obtener tus tareas' });
+  }
+};
+
+// Obtener tareas de un alumno específico en un curso (para maestro/director)
+export const obtenerTareasAlumnoCurso = async (req, res) => {
+  try {
+    const { curso_id, alumno_id } = req.params;
+
+    // Verificar que el alumno esté inscrito en el curso
+    const [inscripcion] = await db.query(
+      'SELECT id FROM curso_alumnos WHERE curso_id = ? AND alumno_id = ?',
+      [curso_id, alumno_id]
+    );
+
+    if (inscripcion.length === 0) {
+      return res.status(404).json({ mensaje: 'El alumno no está inscrito en este curso' });
+    }
+
+    const [tareas] = await db.query(
+      `SELECT 
+        t.id,
+        t.titulo,
+        t.descripcion,
+        t.fecha_asignacion,
+        t.fecha_entrega,
+        t.puntos_totales,
+        t.archivo_adjunto,
+        te.id as entrega_id,
+        te.fecha_entrega as fecha_mi_entrega,
+        te.archivo_entrega,
+        te.estado,
+        te.calificacion,
+        te.comentarios as comentarios_alumno,
+        te.comentarios_calificacion,
+        CASE 
+          WHEN te.estado = 'Rechazada' THEN 'Rechazada'
+          WHEN te.calificacion IS NOT NULL THEN 'Calificada'
+          WHEN te.id IS NOT NULL AND te.estado = 'No entregada' THEN 'No entregada'
+          WHEN te.id IS NOT NULL THEN 'Entregada'
+          ELSE 'Pendiente'
+        END as estado_real
+      FROM tareas t
+      LEFT JOIN tarea_entregas te ON t.id = te.tarea_id AND te.alumno_id = ?
+      WHERE t.curso_id = ? AND t.activo = TRUE
+      ORDER BY t.fecha_entrega DESC`,
+      [alumno_id, curso_id]
+    );
+
+    res.json(tareas);
+  } catch (error) {
+    console.error('Error al obtener tareas del alumno:', error);
+    res.status(500).json({ mensaje: 'Error al obtener las tareas del alumno' });
   }
 };

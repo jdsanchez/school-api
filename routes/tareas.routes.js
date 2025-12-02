@@ -13,7 +13,9 @@ import {
   obtenerEntregas,
   calificarEntrega,
   rechazarEntrega,
-  obtenerMisTareas
+  calificarNoEntrega,
+  obtenerMisTareas,
+  obtenerTareasAlumnoCurso
 } from '../controllers/tareas.controller.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -75,6 +77,7 @@ const uploadEntrega = multer({
 router.use(verifyToken);
 
 router.get('/mis-tareas', obtenerMisTareas); // Para alumnos
+router.get('/curso/:curso_id/alumno/:alumno_id', obtenerTareasAlumnoCurso); // Para maestros/directores ver tareas de un alumno
 router.get('/curso/:curso_id', obtenerTareasPorCurso);
 router.get('/:id', obtenerTarea);
 router.post('/', uploadTarea.single('archivo_adjunto'), crearTarea);
@@ -86,5 +89,6 @@ router.post('/:tarea_id/entregar', uploadEntrega.single('archivo_entrega'), entr
 router.get('/:tarea_id/entregas', obtenerEntregas);
 router.put('/entregas/:id/calificar', calificarEntrega);
 router.put('/entregas/:id/rechazar', rechazarEntrega);
+router.post('/:tarea_id/calificar-no-entrega/:alumno_id', calificarNoEntrega);
 
 export default router;
