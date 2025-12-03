@@ -177,6 +177,7 @@ export const actualizarCurso = async (req, res) => {
       maestro_id,
       cupo_maximo,
       creditos,
+      costo,
       horario,
       aula,
       activo
@@ -185,9 +186,9 @@ export const actualizarCurso = async (req, res) => {
     await db.query(
       `UPDATE cursos 
        SET nombre = ?, codigo = ?, descripcion = ?, fecha_inicio = ?, 
-           fecha_fin = ?, maestro_id = ?, cupo_maximo = ?, creditos = ?, horario = ?, aula = ?, activo = ?
+           fecha_fin = ?, maestro_id = ?, cupo_maximo = ?, creditos = ?, costo = ?, horario = ?, aula = ?, activo = ?
        WHERE id = ?`,
-      [nombre, codigo, descripcion, fecha_inicio, fecha_fin, maestro_id, cupo_maximo, creditos, horario, aula, activo, id]
+      [nombre, codigo, descripcion, fecha_inicio, fecha_fin, maestro_id, cupo_maximo, creditos, costo, horario, aula, activo, id]
     );
     
     res.json({ mensaje: 'Curso actualizado exitosamente' });
@@ -380,5 +381,38 @@ export const obtenerMisAsignaciones = async (req, res) => {
   } catch (error) {
     console.error('Error al obtener mis asignaciones:', error);
     res.status(500).json({ mensaje: 'Error al obtener tus asignaciones' });
+  }
+};
+
+// Obtener alumnos disponibles para inscribir (no inscritos en el curso)
+export const obtenerAlumnosDisponibles = async (req, res) => {
+  try {
+    const { curso_id } = req.params;
+    
+    const [alumnos] = await db.query(
+      `SELECT 
+        u.id,
+        u.nombre,
+        u.apellido,
+        u.email,
+        u.codigo_alumno
+      FROM usuarios u
+      INNER JOIN roles r ON u.rol_id = r.id
+      WHERE r.nombre = 'Alumno' 
+        AND u.activo = TRUE
+        AND u.id NOT IN (
+          SELECT alumno_id 
+          FROM curso_alumnos 
+          WHERE curso_id = ? 
+            AND estado IN ('Inscrito', 'Activo')
+        )
+      ORDER BY u.apellido, u.nombre`,
+      [curso_id]
+    );
+    
+    res.json(alumnos);
+  } catch (error) {
+    console.error('Error al obtener alumnos disponibles:', error);
+    res.status(500).json({ mensaje: 'Error al obtener alumnos disponibles' });
   }
 };
